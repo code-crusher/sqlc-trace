@@ -144,15 +144,20 @@ func (comp *Compiler) resolveCatalogRefs(qc *QueryCatalog, rvs []*ast.RangeVar, 
 		case *ast.A_Expr:
 			// TODO: While this works for a wide range of simple expressions,
 			// more complicated expressions will cause this logic to fail.
-			list := astutils.Search(n.Lexpr, func(node ast.Node) bool {
-				_, ok := node.(*ast.ColumnRef)
-				return ok
-			})
-			if len(list.Items) == 0 {
-				list = astutils.Search(n.Rexpr, func(node ast.Node) bool {
+			// A prefix operator such as `-$1` has no left operand; walking a
+			// nil node panics, so only search the operands that exist.
+			list := &ast.List{}
+			for _, operand := range []ast.Node{n.Lexpr, n.Rexpr} {
+				if operand == nil {
+					continue
+				}
+				list = astutils.Search(operand, func(node ast.Node) bool {
 					_, ok := node.(*ast.ColumnRef)
 					return ok
 				})
+				if len(list.Items) > 0 {
+					break
+				}
 			}
 
 			if len(list.Items) == 0 {

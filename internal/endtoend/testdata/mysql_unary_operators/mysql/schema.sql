@@ -1,0 +1,5 @@
+CREATE TABLE widgets (
+  id     BIGINT PRIMARY KEY,
+  active BOOLEAN NOT NULL,
+  amount BIGINT NOT NULL
+);

@@ -88,6 +88,9 @@ func (a *analyzer) typeExpr(n ast.Node) (exprType, error) {
 	case *ast.CollateExpr:
 		return a.typeExpr(e.Arg)
 
+	case *ast.ParenExpr:
+		return a.typeExpr(e.Expr)
+
 	case *ast.IntervalExpr:
 		// A dialect with no interval type of its own leaves it untyped.
 		oid, err := a.cat.TypeOID("interval")

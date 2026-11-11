@@ -453,12 +453,28 @@ func (c *cc) convertRenameTableStmt(n *pcast.RenameTableStmt) ast.Node {
 	return list
 }
 
-func (c *cc) convertExistsSubqueryExpr(n *pcast.ExistsSubqueryExpr) *ast.SubLink {
+func (c *cc) convertExistsSubqueryExpr(n *pcast.ExistsSubqueryExpr) ast.Node {
 	sublink := &ast.SubLink{
 		SubLinkType: ast.EXISTS_SUBLINK,
+		Location:    n.OriginTextPosition(),
 	}
 	if n.Sel != nil {
-		sublink.Subselect = c.convert(n.Sel)
+		// EXISTS prints its own parentheses around the subselect, so unwrap
+		// the parser's SubqueryExpr: converting it would add a second pair.
+		if sub, ok := n.Sel.(*pcast.SubqueryExpr); ok {
+			sublink.Subselect = c.convert(sub.Query)
+		} else {
+			sublink.Subselect = c.convert(n.Sel)
+		}
+	}
+	// MySQL folds NOT into the EXISTS node; the shared tree spells negation
+	// as a BoolExpr wrapping the sublink, the way every other engine does.
+	if n.Not {
+		return &ast.BoolExpr{
+			Boolop:   ast.BoolExprTypeNot,
+			Args:     &ast.List{Items: []ast.Node{sublink}},
+			Location: n.OriginTextPosition(),
+		}
 	}
 	return sublink
 }
@@ -1766,7 +1782,54 @@ func (c *cc) convertTruncateTableStmt(n *pcast.TruncateTableStmt) *ast.TruncateS
 }
 
 func (c *cc) convertUnaryOperationExpr(n *pcast.UnaryOperationExpr) ast.Node {
-	return todo(n)
+	operand := c.convert(n.V)
+	switch n.Op {
+	case opcode.Not, opcode.Not2:
+		// MySQL spells logical negation both NOT and !, and the shared tree
+		// keeps only the operation, so either spelling prints as NOT. The
+		// printer parenthesizes the AND/OR it needs, and NOT binds looser
+		// than comparison, so the operand's own grouping is enough.
+		return &ast.BoolExpr{
+			Boolop:   ast.BoolExprTypeNot,
+			Args:     &ast.List{Items: []ast.Node{operand}},
+			Location: n.OriginTextPosition(),
+		}
+	case opcode.Plus:
+		// A unary plus is a no-op on every operand MySQL accepts.
+		return operand
+	case opcode.Minus:
+		return &ast.A_Expr{
+			Name:     &ast.List{Items: []ast.Node{&ast.String{Str: "-"}}},
+			Rexpr:    c.prefixOperand(n, operand),
+			Location: n.OriginTextPosition(),
+		}
+	case opcode.BitNeg:
+		return &ast.A_Expr{
+			Name:     &ast.List{Items: []ast.Node{&ast.String{Str: "~"}}},
+			Rexpr:    c.prefixOperand(n, operand),
+			Location: n.OriginTextPosition(),
+		}
+	default:
+		return todo(n)
+	}
+}
+
+// prefixOperand keeps the parentheses around a prefix operator's operand.
+// convertParenthesesExpr unwraps everything that is not a SELECT, relying on
+// the printer's own grouping, but the printer does not group a prefix
+// operator's operand: `-(a + 1)` would print as `- a + 1` and mean something
+// else.
+func (c *cc) prefixOperand(n *pcast.UnaryOperationExpr, operand ast.Node) ast.Node {
+	if _, ok := n.V.(*pcast.ParenthesesExpr); !ok {
+		return operand
+	}
+	if _, isSelect := operand.(*ast.SelectStmt); isSelect {
+		return operand
+	}
+	return &ast.ParenExpr{
+		Expr:     operand,
+		Location: n.V.OriginTextPosition(),
+	}
 }
 
 func (c *cc) convertUnlockTablesStmt(n *pcast.UnlockTablesStmt) ast.Node {
