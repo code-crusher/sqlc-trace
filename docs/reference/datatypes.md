@@ -123,7 +123,9 @@ type Author struct {
 ## UUIDs
 
 For UUID support, sqlc uses the `github.com/google/uuid` package by default.
-The pgx/v5 sql package uses `pgtype.UUID`.
+The pgx/v5 sql package uses `pgtype.UUID`. To generate the standard library
+`uuid` package instead, see [Using the standard library uuid
+package](#using-the-standard-library-uuid-package).
 
 ```sql
 CREATE TABLE records (
@@ -146,13 +148,8 @@ type Author struct {
 ### Using the standard library uuid package
 
 Go 1.27 added a [`uuid`](https://pkg.go.dev/uuid) package to the standard
-library. sqlc will use this package by default in a future release. Until
-then, use it today with type overrides
-(see [Overriding types](../howto/overrides.md) for details).
-
-Two overrides are required: one for non-nullable columns and one for nullable
-columns. The standard library does not include a `NullUUID` type, so nullable
-columns map to `*uuid.UUID` instead.
+library. Set `emit_stdlib_uuid` to generate it for PostgreSQL UUID columns
+instead of `github.com/google/uuid`:
 
 ```yaml
 version: "2"
@@ -165,19 +162,10 @@ sql:
         package: "db"
         out: "db"
         sql_package: "pgx/v5"
-        overrides:
-          - db_type: "uuid"
-            go_type: "uuid.UUID"
-          - db_type: "uuid"
-            nullable: true
-            go_type:
-              import: "uuid"
-              type: "UUID"
-              pointer: true
+        emit_stdlib_uuid: true
 ```
 
-With this configuration, a table with both nullable and non-nullable `uuid`
-columns:
+A table with both nullable and non-nullable `uuid` columns:
 
 ```sql
 CREATE TABLE records (
@@ -186,7 +174,7 @@ CREATE TABLE records (
 );
 ```
 
-generates:
+then generates:
 
 ```go
 package db
@@ -201,11 +189,39 @@ type Record struct {
 }
 ```
 
-These overrides work with both the `pgx/v5` and `database/sql` sql packages.
+The standard library does not include a `NullUUID` type, so a nullable column
+maps to `*uuid.UUID`, which every supported driver scans a `NULL` into. Because
+the generated code imports `uuid`, it needs Go 1.27 or later to build. sqlc
+itself still builds with Go 1.26, so this option defaults to `false`; combine
+it with [`build_tags`](config.md) to keep a module that must also build with
+older toolchains compiling:
+
+```yaml
+        emit_stdlib_uuid: true
+        build_tags: "go1.27"
+```
+
+The option works with the `pgx/v4`, `pgx/v5` and `database/sql` sql packages.
 pgx supports any type whose underlying type is `[16]byte`, and as of Go 1.27
 `database/sql` converts `uuid.UUID` values in both directions: parameters are
 bound via `driver.DefaultParameterConverter` and results are scanned into
 `uuid.UUID` and `*uuid.UUID` destinations, with `nil` representing `NULL`.
+
+If you need the standard library type on an older sqlc, the same output can be
+produced with two type overrides, one for non-nullable columns and one for
+nullable columns (see [Overriding types](../howto/overrides.md) for details):
+
+```yaml
+        overrides:
+          - db_type: "uuid"
+            go_type: "uuid.UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "uuid"
+              type: "UUID"
+              pointer: true
+```
 
 For MySQL, there is no native `uuid` data type. When using `UUID_TO_BIN` to store a `UUID()`, the underlying field type is `BINARY(16)` which by default sqlc would map to `sql.NullString`. To have sqlc automatically convert these fields to a `uuid.UUID` type, use an overide on the column storing the `uuid`
 (see [Overriding types](../howto/overrides.md) for details).

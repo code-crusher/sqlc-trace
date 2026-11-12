@@ -22,6 +22,9 @@ type Options struct {
 	EmitParamsStructPointers  bool `json:"emit_params_struct_pointers" yaml:"emit_params_struct_pointers"`
 	EmitMethodsWithDbArgument bool `json:"emit_methods_with_db_argument,omitempty" yaml:"emit_methods_with_db_argument"`
 	EmitPointersForNullTypes  bool `json:"emit_pointers_for_null_types" yaml:"emit_pointers_for_null_types"`
+	// EmitStdlibUUID maps a UUID column to the uuid package Go 1.27 added to
+	// the standard library instead of github.com/google/uuid.
+	EmitStdlibUUID bool `json:"emit_stdlib_uuid,omitempty" yaml:"emit_stdlib_uuid"`
 	// nil inherits EmitPointersForNullTypes; non-nil overrides for enums only.
 	EmitPointersForNullEnumTypes *bool             `json:"emit_pointers_for_null_enum_types,omitempty" yaml:"emit_pointers_for_null_enum_types"`
 	EmitEnumValidMethod          bool              `json:"emit_enum_valid_method,omitempty" yaml:"emit_enum_valid_method"`

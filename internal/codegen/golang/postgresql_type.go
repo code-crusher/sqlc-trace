@@ -274,6 +274,15 @@ func postgresType(req *plugin.GenerateRequest, options *opts.Options, col *plugi
 		return "sql.NullString"
 
 	case "uuid":
+		if options.EmitStdlibUUID {
+			// The uuid package Go 1.27 added to the standard library has no
+			// NullUUID, so a nullable column is a pointer, which every
+			// supported driver scans a NULL into.
+			if notNull {
+				return "uuid.UUID"
+			}
+			return "*uuid.UUID"
+		}
 		if driver == opts.SQLDriverPGXV5 {
 			return "pgtype.UUID"
 		}

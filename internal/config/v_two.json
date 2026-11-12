@@ -134,6 +134,9 @@
                                     "emit_pointers_for_null_types": {
                                         "type": "boolean"
                                     },
+                                    "emit_stdlib_uuid": {
+                                        "type": "boolean"
+                                    },
                                     "emit_pointers_for_null_enum_types": {
                                         "type": "boolean"
                                     },

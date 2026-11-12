@@ -1,0 +1,28 @@
+{
+  "version": "1",
+  "packages": [
+    {
+      "path": "go",
+      "name": "querytest",
+      "engine": "postgresql",
+      "schema": "schema.sql",
+      "queries": "query.sql",
+      "build_tags": "go1.27"
+    }
+  ],
+  "overrides": [
+    {
+      "db_type": "uuid",
+      "go_type": "uuid.UUID"
+    },
+    {
+      "db_type": "uuid",
+      "nullable": true,
+      "go_type": {
+        "import": "uuid",
+        "type": "UUID",
+        "pointer": true
+      }
+    }
+  ]
+}

@@ -161,6 +161,8 @@ The `gen` mapping supports the following keys:
   - If true, generated types for nullable columns are emitted as pointers (ie. `*string`) instead of `database/sql` null types (ie. `NullString`). Currently only supported for PostgreSQL if `sql_package` is `pgx/v4` or `pgx/v5`, and for SQLite. Defaults to `false`. Nullable enum columns also follow this setting unless `emit_pointers_for_null_enum_types` is set.
 - `emit_pointers_for_null_enum_types`:
   - Overrides `emit_pointers_for_null_types` for nullable enum columns only. When `true`, nullable enum columns are emitted as pointers (ie. `*UserRole`). When `false`, nullable enum columns use the generated `NullUserRole` wrapper struct even if `emit_pointers_for_null_types` is true. Set this to `false` to keep the pre-v1.31 behavior when upgrading. Only applies to PostgreSQL with `sql_package` `pgx/v4` or `pgx/v5`.
+- `emit_stdlib_uuid`:
+  - If true, PostgreSQL UUID columns map to the `uuid` package Go 1.27 added to the standard library instead of `github.com/google/uuid`. Nullable columns map to `*uuid.UUID`, as the standard library has no `NullUUID`. The generated code requires Go 1.27 or later. Defaults to `false`. See [UUIDs](datatypes.md#uuids).
 - `emit_enum_valid_method`:
   - If true, generate a Valid method on enum types,
     indicating whether a string is a valid enum value.
@@ -391,6 +393,7 @@ packages:
     emit_params_struct_pointers: false
     emit_methods_with_db_argument: false
     emit_pointers_for_null_types: false
+    emit_stdlib_uuid: false
     emit_enum_valid_method: false
     emit_all_enum_values: false
     build_tags: "some_tag"
@@ -446,6 +449,8 @@ Each mapping in the `packages` collection has the following keys:
   - If true and `sql_package` is set to `pgx/v4` or `pgx/v5`, generated types for nullable columns are emitted as pointers (ie. `*string`) instead of `database/sql` null types (ie. `NullString`). Defaults to `false`. Nullable enum columns also follow this setting unless `emit_pointers_for_null_enum_types` is set.
 - `emit_pointers_for_null_enum_types`:
   - Overrides `emit_pointers_for_null_types` for nullable enum columns only. When `true`, nullable enum columns are emitted as pointers (ie. `*UserRole`). When `false`, nullable enum columns use the generated `NullUserRole` wrapper struct even if `emit_pointers_for_null_types` is true. Set this to `false` to keep the pre-v1.31 behavior when upgrading. Only applies to PostgreSQL with `sql_package` `pgx/v4` or `pgx/v5`.
+- `emit_stdlib_uuid`:
+  - If true, PostgreSQL UUID columns map to the `uuid` package Go 1.27 added to the standard library instead of `github.com/google/uuid`. Nullable columns map to `*uuid.UUID`, as the standard library has no `NullUUID`. The generated code requires Go 1.27 or later. Defaults to `false`. See [UUIDs](datatypes.md#uuids).
 - `emit_enum_valid_method`:
   - If true, generate a Valid method on enum types,
     indicating whether a string is a valid enum value.

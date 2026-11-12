@@ -157,6 +157,17 @@ var stdlibTypes = map[string]string{
 	"big.Rat":          "math/big",
 }
 
+// isStdlibImport reports whether path names a package in the standard
+// library. Go requires a dot in the first element of a module path, so a
+// path whose first element has none is a standard library package: the
+// same rule cmd/go uses to tell the two apart. sqlc's own build may predate
+// a package the user's toolchain has (uuid arrived in Go 1.27), so asking
+// the local GOROOT would not answer this.
+func isStdlibImport(path string) bool {
+	first, _, _ := strings.Cut(path, "/")
+	return first != "" && !strings.Contains(first, ".")
+}
+
 // driverTypes are the packages the ClickHouse, DuckDB, Spanner and SQL
 // Server mappers draw types from, by the qualifier those types carry.
 var driverTypes = map[string]string{
@@ -256,7 +267,12 @@ func buildImports(options *opts.Options, engine string, queries []Query, uses fu
 	}
 	_, overrideUUID := overrideTypes["uuid.UUID"]
 	if uses("uuid.UUID") && !overrideUUID {
-		pkg[ImportSpec{Path: "github.com/google/uuid"}] = struct{}{}
+		if options.EmitStdlibUUID && engine == enginePostgreSQL {
+			// The uuid package Go 1.27 added to the standard library.
+			std["uuid"] = struct{}{}
+		} else {
+			pkg[ImportSpec{Path: "github.com/google/uuid"}] = struct{}{}
+		}
 	}
 	_, overrideNullUUID := overrideTypes["uuid.NullUUID"]
 	if uses("uuid.NullUUID") && !overrideNullUUID {
@@ -277,6 +293,16 @@ func buildImports(options *opts.Options, engine string, queries []Query, uses fu
 		_, alreadyImported := std[o.GoType.ImportPath]
 		hasPackageAlias := o.GoType.Package != ""
 		if (!alreadyImported || hasPackageAlias) && uses(o.GoType.TypeName) {
+			if isStdlibImport(o.GoType.ImportPath) && !hasPackageAlias {
+				// An override may name a package the standard library
+				// provides, such as the uuid package Go 1.27 added; it
+				// belongs in the standard library group, not with the
+				// third-party dependencies. An aliased import keeps the
+				// third-party group, which is the only one that can carry
+				// the alias.
+				std[o.GoType.ImportPath] = struct{}{}
+				continue
+			}
 			pkg[ImportSpec{Path: o.GoType.ImportPath, ID: o.GoType.Package}] = struct{}{}
 		}
 	}
